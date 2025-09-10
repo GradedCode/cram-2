@@ -1,37 +1,56 @@
-# CramSmart - Study Panic-Proof
+# CramSmart - Study Session Management App
 
 ## Overview
-CramSmart is a React-based web application that helps students create personalized, timeboxed study guides from uploaded notes and materials. Built with modern web technologies including React, TypeScript, Vite, and shadcn-ui components.
+CramSmart is a React-based study application that helps students create timeboxed study guides from their uploaded notes and materials. Students can upload their study materials and get AI-powered, personalized study sessions ranging from 15 minutes to 8 hours.
 
 ## Project Architecture
-- **Frontend**: React 18 + TypeScript + Vite
+- **Frontend**: React 18 with TypeScript
+- **Build Tool**: Vite 5.4.19
 - **UI Framework**: shadcn-ui components with Tailwind CSS
-- **State Management**: React hooks with TanStack Query
-- **Routing**: React Router DOM
-- **Build Tool**: Vite with SWC for fast compilation
-- **Package Manager**: npm
+- **Routing**: React Router DOM v6
+- **State Management**: React Query (TanStack Query)
+- **Styling**: Tailwind CSS with custom theme
 
-## Key Features
-- File upload interface for study materials
-- Timeboxed study sessions (15 minutes to 8 hours)
-- AI-powered study guide generation
-- Responsive design with modern UI components
-- Multi-step workflow for creating study plans
+## Recent Changes (Sept 10, 2025)
+- ✅ Configured for Replit environment
+- ✅ Updated Vite config to use port 5000 with host 0.0.0.0
+- ✅ Set allowedHosts: true to work with Replit's proxy
+- ✅ Installed Node.js 20 and all dependencies
+- ✅ Configured deployment for autoscale target
+- ✅ Set up Frontend workflow
 
-## Development Setup
-- **Port**: 5000 (configured for Replit environment)
-- **Host**: 0.0.0.0 (allows proxy access)
-- **Dev Command**: `npm run dev`
+## Project Structure
+```
+src/
+├── components/
+│   ├── ui/           # shadcn-ui components
+│   ├── CramGuidePreview.tsx
+│   ├── TimeboxSelector.tsx
+│   └── UploadInterface.tsx
+├── pages/
+│   ├── Index.tsx     # Main application page
+│   └── NotFound.tsx
+├── hooks/
+├── lib/
+└── assets/
+```
+
+## Development
+- **Dev Server**: `npm run dev` (port 5000)
+- **Build**: `npm run build`
+- **Preview**: `npm run preview`
+
+## Deployment Configuration
+- **Target**: Autoscale (for stateless frontend)
 - **Build Command**: `npm run build`
+- **Run Command**: `npm run preview -- --host 0.0.0.0 --port 5000`
 
-## Recent Changes
-- Configured Vite for Replit environment (port 5000, host 0.0.0.0)
-- Set up development workflow
-- Configured deployment for autoscale hosting
-- Installed Node.js 20 and project dependencies
+## Features
+- Upload study materials (notes, past papers)
+- AI-powered study guide generation
+- Timeboxed study sessions (15min - 8hrs)
+- Responsive design with modern UI
+- Progress tracking and adaptive timing
 
-## Deployment
-- **Target**: Autoscale (stateless frontend)
-- **Build**: npm run build
-- **Run**: npm run preview with proper host/port configuration
-- Ready for Replit deployment when needed
+## Current State
+✅ **WORKING** - Application is running successfully on port 5000 and accessible through Replit's web preview.
