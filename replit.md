@@ -1,56 +1,47 @@
-# CramSmart - Study Session Management App
+# CramSmart - AI-Powered Study Guide Generator
 
 ## Overview
-CramSmart is a React-based study application that helps students create timeboxed study guides from their uploaded notes and materials. Students can upload their study materials and get AI-powered, personalized study sessions ranging from 15 minutes to 8 hours.
+CramSmart is a React-based application that transforms your study materials into personalized, AI-powered study guides. Upload your notes, select your preferences, and generate a comprehensive report complete with a summary, keywords, and flashcards.
 
 ## Project Architecture
 - **Frontend**: React 18 with TypeScript
 - **Build Tool**: Vite 5.4.19
 - **UI Framework**: shadcn-ui components with Tailwind CSS
-- **Routing**: React Router DOM v6
-- **State Management**: React Query (TanStack Query)
-- **Styling**: Tailwind CSS with custom theme
+- **AI Integration**: Google Gemini Pro
+- **PDF Generation**: jsPDF, html2canvas
 
-## Recent Changes (Sept 10, 2025)
-- ✅ Configured for Replit environment
-- ✅ Updated Vite config to use port 5000 with host 0.0.0.0
-- ✅ Set allowedHosts: true to work with Replit's proxy
-- ✅ Installed Node.js 20 and all dependencies
-- ✅ Configured deployment for autoscale target
-- ✅ Set up Frontend workflow
+## Recent Changes (Sept 12, 2025)
+- ✅ **AI Integration**: Integrated Google Gemini Pro for dynamic content generation.
+- ✅ **API Key Management**: Added an input field for users to enter and save their Gemini API key in local storage.
+- ✅ **Customizable Reports**: Implemented options for users to customize the number of flashcards (5-20) and the summary length (short, medium, long).
+- ✅ **Regenerate Reports**: Added a "Regenerate" button to allow users to request a new report.
+- ✅ **PDF Downloads**: Enabled users to download their generated study guides as a PDF.
+- ✅ **UI Enhancements**: Added new components for sliders, toggle groups, and improved user feedback with toasts and error messages.
 
 ## Project Structure
 ```
 src/
 ├── components/
 │   ├── ui/           # shadcn-ui components
-│   ├── CramGuidePreview.tsx
-│   ├── TimeboxSelector.tsx
-│   └── UploadInterface.tsx
-├── pages/
-│   ├── Index.tsx     # Main application page
-│   └── NotFound.tsx
+│   ├── CramGuidePreview.tsx  # Displays the generated report and customization options
+│   ├── Report.tsx         # Renders the structured AI-generated report
+│   └── UploadInterface.tsx   # Handles file uploads and text extraction
 ├── hooks/
-├── lib/
-└── assets/
+│   ├── use-ai.ts      # Communicates with the Gemini API
+│   └── use-toast.ts   # Manages app notifications
+└── ...
 ```
 
-## Development
-- **Dev Server**: `npm run dev` (port 5000)
-- **Build**: `npm run build`
-- **Preview**: `npm run preview`
-
-## Deployment Configuration
-- **Target**: Autoscale (for stateless frontend)
-- **Build Command**: `npm run build`
-- **Run Command**: `npm run preview -- --host 0.0.0.0 --port 5000`
-
 ## Features
-- Upload study materials (notes, past papers)
-- AI-powered study guide generation
-- Timeboxed study sessions (15min - 8hrs)
-- Responsive design with modern UI
-- Progress tracking and adaptive timing
+- **Upload Study Materials**: Supports uploading multiple files to be processed into a single body of text.
+- **AI-Powered Study Guides**: Generates a structured report with a summary, keywords, and flashcards.
+- **Customizable Content**:
+    - Choose the number of flashcards (5-20).
+    - Select the desired summary length (short, medium, or long).
+- **Secure API Key Storage**: Saves your Gemini API key locally for convenient reuse.
+- **Download as PDF**: Export your study guide as a high-quality PDF for offline access.
+- **Regenerate on Demand**: Don't like the first report? Regenerate it with a single click.
+- **Responsive Design**: A modern, intuitive interface that works on any device.
 
 ## Current State
-✅ **WORKING** - Application is running successfully on port 5000 and accessible through Replit's web preview.
+✅ **WORKING** - The application is fully functional and deployed. All new features have been tested and are working as expected.

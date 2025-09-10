@@ -7,18 +7,85 @@ import { TimeboxSelector } from '@/components/TimeboxSelector';
 import { CramGuidePreview } from '@/components/CramGuidePreview';
 import { Clock, Zap, Target, Star, ArrowRight } from 'lucide-react';
 import heroImage from '@/assets/hero-study.jpg';
+import * as pdfjs from 'pdfjs-dist';
+import mammoth from 'mammoth';
+import PptxParser from 'pptx-parser';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const Index = () => {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [currentStep, setCurrentStep] = useState<'hero' | 'upload' | 'timebox' | 'preview'>('hero');
+  const [extractedText, setExtractedText] = useState<string>('');
+
+  const parseFile = async (file: File): Promise<string> => {
+    const reader = new FileReader();
+
+    return new Promise((resolve, reject) => {
+      reader.onload = async (event) => {
+        if (!event.target?.result) {
+          return reject('FileReader error');
+        }
+        const arrayBuffer = event.target.result as ArrayBuffer;
+
+        try {
+          if (file.name.endsWith('.pdf')) {
+            const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+            let text = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const content = await page.getTextContent();
+              text += content.items.map(item => (item as any).str).join(' ');
+            }
+            resolve(text);
+          } else if (file.name.endsWith('.docx')) {
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            resolve(result.value);
+          } else if (file.name.endsWith('.pptx')) {
+            const parser = new PptxParser();
+            const result = await parser.parse(arrayBuffer);
+            if (result && result.slides) {
+                resolve(result.slides.map(slide => slide.text).join('\n\n'));
+            } else {
+                resolve('');
+            }
+          } else {
+            resolve('File type not supported');
+          }
+        } catch (error) {
+          console.error('Error parsing file:', error);
+          reject(`Error parsing ${file.name}`);
+        }
+      };
+
+      reader.onerror = (error) => {
+        reject(error);
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  };
 
   const handleGetStarted = () => {
     setCurrentStep('upload');
   };
 
-  const handleUploadComplete = (files: File[]) => {
+  const handleUploadComplete = async (files: File[]) => {
     setUploadedFiles(prev => [...prev, ...files]);
+    
+    let combinedText = '';
+    for (const file of files) {
+      try {
+        const text = await parseFile(file);
+        combinedText += text + '\n\n';
+      } catch (error) {
+        console.error(error);
+        combinedText += `Could not parse ${file.name}\n\n`;
+      }
+    }
+    setExtractedText(combinedText.trim());
+
     if (files.length > 0) {
       setCurrentStep('timebox');
     }
@@ -26,6 +93,10 @@ const Index = () => {
 
   const handleTimeSelect = (duration: string) => {
     setSelectedTime(duration);
+    setCurrentStep('preview');
+  };
+
+  const handleGenerate = () => {
     setCurrentStep('preview');
   };
 
@@ -148,7 +219,7 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-2 gap-8">
           <div className="space-y-8">
-            {currentStep === 'upload' && (
+            {(currentStep === 'upload' || currentStep === 'timebox' || currentStep === 'preview') && (
               <UploadInterface onUploadComplete={handleUploadComplete} />
             )}
             
@@ -159,8 +230,8 @@ const Index = () => {
 
           <div>
             <CramGuidePreview 
-              timeSelected={selectedTime} 
-              filesUploaded={uploadedFiles.length} 
+              extractedText={extractedText} 
+              onGenerate={handleGenerate} 
             />
           </div>
         </div>
