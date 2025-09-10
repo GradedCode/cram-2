@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
-import { pipeline, Pipeline } from '@xenova/transformers';
+import { pipeline, env } from '@xenova/transformers';
+
+// Configure environment to fix CORS issues
+env.allowLocalModels = false;
+env.useBrowserCache = false;
 
 // Define the structure of the AI's response, same as the old hook
 export interface AiResponse {
@@ -9,8 +13,8 @@ export interface AiResponse {
 }
 
 // Cache for the pipeline instances
-let summarizerCache: Pipeline | null = null;
-let keywordCache: Pipeline | null = null;
+let summarizerCache: any = null;
+let keywordCache: any = null;
 
 // A simple list of common English stop words
 const STOP_WORDS = new Set([
