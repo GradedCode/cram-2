@@ -8,19 +8,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
 interface TimeSlot {
-  startTime: string;
-  endTime: string;
-  duration: number;
-  task: string;
-  priority: 'CRITICAL' | 'HIGH_IMPACT' | 'DEPTH' | 'BREAK';
+  timeSlot: string;
+  taskTopic: string;
+  priority: 'High' | 'Med' | 'Low' | '—';
+  notesResources: string;
   completed: boolean;
-  confidence: number;
-  energyBefore: number;
-  energyAfter: number;
-  notes: string;
-  resources: string[];
-  startedAt?: string;
-  finishedAt?: string;
+}
+
+interface PriorityItem {
+  topic: string;
+  completed: boolean;
 }
 
 interface StudyPlan {
@@ -29,10 +26,13 @@ interface StudyPlan {
   timeLeft: string;
   motivation: string;
   schedule: TimeSlot[];
-  quickReference: { formula: string; definition: string }[];
-  currentProgress: number;
-  overallEnergy: number;
-  weakAreas: string[];
+  highPriority: PriorityItem[];
+  mediumPriority: PriorityItem[];
+  lowPriority: PriorityItem[];
+  quickReference: string[];
+  progressPercent: number;
+  energyLevel: '😃' | '🙂' | '😐' | '😴';
+  reviewNotes: string[];
 }
 
 interface CramGuidePreviewProps {
@@ -42,74 +42,107 @@ interface CramGuidePreviewProps {
 
 export function CramGuidePreview({ timeSelected, filesUploaded = 0 }: CramGuidePreviewProps) {
   const { toast } = useToast();
-  const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
-  const [showPanicMode, setShowPanicMode] = useState(false);
-  const [currentEnergy, setCurrentEnergy] = useState(4);
   
-  // Generate time slots based on selected duration
-  const generateTimeSlots = (duration: string): TimeSlot[] => {
-    const baseSlots: Partial<TimeSlot>[] = [];
+  // Generate time-blocked schedule based on selected duration - matching the original template
+  const generateSchedule = (duration: string): TimeSlot[] => {
     const now = new Date();
+    let currentTime = new Date(now);
+    
+    // Define time durations for each task type
+    const getSlotDuration = (taskType: string, sessionDuration: string): number => {
+      if (sessionDuration === '15min') {
+        if (taskType.includes('Review')) return 5;
+        if (taskType.includes('Practice')) return 8;
+        return 2;
+      } else if (sessionDuration === '30min') {
+        if (taskType.includes('Summary')) return 10;
+        if (taskType.includes('Practice')) return 15;
+        return 5;
+      } else if (sessionDuration === '1hr') {
+        if (taskType.includes('Summary')) return 20;
+        if (taskType.includes('Practice')) return 25;
+        if (taskType.includes('Break')) return 5;
+        return 10;
+      } else if (sessionDuration === '2hr') {
+        if (taskType.includes('Break')) return 10;
+        if (taskType.includes('Summary')) return 20;
+        if (taskType.includes('Practice')) return 25;
+        return 20;
+      } else {
+        if (taskType.includes('Break')) return 30;
+        return 60;
+      }
+    };
+    
+    // Define schedule templates
+    let scheduleTemplate: Array<{taskTopic: string; priority: TimeSlot['priority']; notesResources: string}> = [];
     
     if (duration === '15min') {
-      baseSlots.push(
-        { task: 'Key Formulas Review', duration: 5, priority: 'CRITICAL' },
-        { task: 'Practice Questions', duration: 8, priority: 'CRITICAL' },
-        { task: 'Final Quick Review', duration: 2, priority: 'HIGH_IMPACT' }
-      );
+      scheduleTemplate = [
+        { taskTopic: 'Key Formulas Review', priority: 'High', notesResources: 'Key definitions' },
+        { taskTopic: 'Practice Questions', priority: 'High', notesResources: 'Focus weak spots' },
+        { taskTopic: 'Final Quick Review', priority: 'Med', notesResources: 'Flashcards / key facts' }
+      ];
     } else if (duration === '30min') {
-      baseSlots.push(
-        { task: 'Core Concepts Review', duration: 10, priority: 'CRITICAL' },
-        { task: 'Practice Problems', duration: 15, priority: 'CRITICAL' },
-        { task: 'Quick Reference Check', duration: 5, priority: 'HIGH_IMPACT' }
-      );
+      scheduleTemplate = [
+        { taskTopic: 'Chapter 1 Summary', priority: 'High', notesResources: 'Key definitions' },
+        { taskTopic: 'Practice Questions', priority: 'High', notesResources: 'Focus weak spots' },
+        { taskTopic: 'Final Review', priority: 'Med', notesResources: 'Flashcards' }
+      ];
     } else if (duration === '1hr') {
-      baseSlots.push(
-        { task: 'Chapter 1 Summary', duration: 20, priority: 'CRITICAL' },
-        { task: 'Practice Questions', duration: 25, priority: 'CRITICAL' },
-        { task: 'Break', duration: 5, priority: 'BREAK' },
-        { task: 'Weak Areas Focus', duration: 10, priority: 'HIGH_IMPACT' }
-      );
+      scheduleTemplate = [
+        { taskTopic: 'Chapter 1 Summary', priority: 'High', notesResources: 'Key definitions' },
+        { taskTopic: 'Practice Questions / Past Qs', priority: 'High', notesResources: 'Focus weak spots' },
+        { taskTopic: 'Break / Snack', priority: '—', notesResources: 'No screens' },
+        { taskTopic: 'Flashcards Review', priority: 'Med', notesResources: 'Self-test' }
+      ];
     } else if (duration === '2hr') {
-      baseSlots.push(
-        { task: 'Topic 1 Deep Dive', duration: 35, priority: 'CRITICAL' },
-        { task: 'Break', duration: 10, priority: 'BREAK' },
-        { task: 'Practice Problems', duration: 40, priority: 'CRITICAL' },
-        { task: 'Break', duration: 10, priority: 'BREAK' },
-        { task: 'Topic 2 Review', duration: 20, priority: 'HIGH_IMPACT' },
-        { task: 'Final Review', duration: 5, priority: 'DEPTH' }
-      );
+      scheduleTemplate = [
+        { taskTopic: 'Chapter 1 Summary', priority: 'High', notesResources: 'Key definitions' },
+        { taskTopic: 'Practice Questions / Past Qs', priority: 'High', notesResources: 'Focus weak spots' },
+        { taskTopic: 'Topic 2', priority: 'Med', notesResources: 'Highlight formulas' },
+        { taskTopic: 'Break / Snack', priority: '—', notesResources: 'No screens' },
+        { taskTopic: 'Practice Problems', priority: 'High', notesResources: 'Time yourself' },
+        { taskTopic: 'Final Notes', priority: '—', notesResources: 'Write weak areas' }
+      ];
     } else {
-      baseSlots.push(
-        { task: 'Topic 1 Comprehensive', duration: 45, priority: 'CRITICAL' },
-        { task: 'Break', duration: 15, priority: 'BREAK' },
-        { task: 'Practice Session 1', duration: 45, priority: 'CRITICAL' },
-        { task: 'Break', duration: 15, priority: 'BREAK' },
-        { task: 'Topic 2 Deep Study', duration: 60, priority: 'HIGH_IMPACT' },
-        { task: 'Break', duration: 15, priority: 'BREAK' },
-        { task: 'Advanced Topics', duration: 45, priority: 'DEPTH' },
-        { task: 'Final Review', duration: 20, priority: 'HIGH_IMPACT' }
-      );
+      scheduleTemplate = [
+        { taskTopic: 'Chapter 1 Summary', priority: 'High', notesResources: 'Key definitions' },
+        { taskTopic: 'Practice Questions / Past Qs', priority: 'High', notesResources: 'Focus weak spots' },
+        { taskTopic: 'Topic 2', priority: 'Med', notesResources: 'Highlight formulas' },
+        { taskTopic: 'Break / Snack', priority: '—', notesResources: 'No screens' },
+        { taskTopic: 'Topic 3 / Flashcards', priority: 'High', notesResources: 'Self-test' },
+        { taskTopic: 'Practice Problems', priority: 'High', notesResources: 'Time yourself' },
+        { taskTopic: 'Topic 4', priority: 'Med', notesResources: 'Skim notes' },
+        { taskTopic: 'Break', priority: '—', notesResources: 'Stretch / walk' },
+        { taskTopic: 'Topic 5 Review', priority: 'Low', notesResources: 'Light reading' },
+        { taskTopic: 'Rapid Fire Review', priority: 'High', notesResources: 'Flashcards / key facts' },
+        { taskTopic: 'Final Notes', priority: '—', notesResources: 'Write weak areas' }
+      ];
     }
     
-    let currentTime = new Date(now);
-    return baseSlots.map((slot, index) => {
+    return scheduleTemplate.map((template, index) => {
+      const slotDuration = getSlotDuration(template.taskTopic, duration);
       const startTime = new Date(currentTime);
-      currentTime.setMinutes(currentTime.getMinutes() + (slot.duration || 0));
+      currentTime.setMinutes(currentTime.getMinutes() + slotDuration);
       const endTime = new Date(currentTime);
       
+      const timeSlot = `${startTime.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      })} – ${endTime.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      })}`;
+      
       return {
-        startTime: startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        endTime: endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        duration: slot.duration || 0,
-        task: slot.task || '',
-        priority: slot.priority as TimeSlot['priority'],
-        completed: index === 0, // Mark first item as completed for demo
-        confidence: Math.floor(Math.random() * 3) + 3, // 3-5 rating
-        energyBefore: 4,
-        energyAfter: 0,
-        notes: '',
-        resources: slot.priority === 'CRITICAL' ? ['Key formulas', 'Past papers'] : ['Study notes'],
+        timeSlot,
+        taskTopic: template.taskTopic,
+        priority: template.priority,
+        notesResources: template.notesResources,
+        completed: index === 0 // Mark first item as completed for demo
       };
     });
   };
@@ -119,15 +152,30 @@ export function CramGuidePreview({ timeSelected, filesUploaded = 0 }: CramGuideP
     examDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString(),
     timeLeft: timeSelected ? `${timeSelected} session` : '2 days',
     motivation: 'Focus now, relax later.',
-    schedule: generateTimeSlots(timeSelected || '1hr'),
-    quickReference: [
-      { formula: 'Big O(n) = O(n²)', definition: 'Time complexity for nested loops' },
-      { formula: 'Binary Search = O(log n)', definition: 'Divide and conquer search' },
-      { formula: 'Hash Table = O(1)', definition: 'Average case lookup time' }
+    schedule: generateSchedule(timeSelected || '1hr'),
+    highPriority: [
+      { topic: 'Data Structures & Algorithms', completed: true },
+      { topic: 'Object-Oriented Programming', completed: false }
     ],
-    currentProgress: 15,
-    overallEnergy: currentEnergy,
-    weakAreas: ['Graph Algorithms', 'Dynamic Programming', 'System Design']
+    mediumPriority: [
+      { topic: 'Database Design', completed: false },
+      { topic: 'Software Engineering', completed: false }
+    ],
+    lowPriority: [
+      { topic: 'Advanced Topics', completed: false }
+    ],
+    quickReference: [
+      'Big O Notation: O(1) < O(log n) < O(n) < O(n²)',
+      'Binary Search: O(log n) time complexity',
+      'Hash Tables: O(1) average lookup time',
+      'Recursion: Function calls itself with base case'
+    ],
+    progressPercent: 60,
+    energyLevel: '🙂',
+    reviewNotes: [
+      'Review graph algorithms - still weak',
+      'Practice more dynamic programming problems'
+    ]
   };
 
   const handleDownload = () => {
@@ -184,69 +232,82 @@ export function CramGuidePreview({ timeSelected, filesUploaded = 0 }: CramGuideP
   };
 
   const generateNotionFormattedText = () => {
-    return `# 📘 CRAM PLAN • ${studyPlan.examName}
-🗓️ ${studyPlan.examDate} • ⏳ ${studyPlan.timeLeft}
+    return `📘 Last-Minute Study Plan
 
-💪 Focus Mantra: "${studyPlan.motivation}"
+**Exam:** ${studyPlan.examName}
+**Date:** ${studyPlan.examDate}
+**Time Left:** ⏳ ${studyPlan.timeLeft}
 
----
+**Motivation:** "${studyPlan.motivation}"
 
 ## ⏱️ Time-Blocked Schedule
 
-${studyPlan.schedule.map(slot => `
-### ${slot.completed ? '☑️' : '☐'} ${slot.startTime} - ${slot.endTime} | ${slot.task} (${slot.duration}min)
-**Priority:** ${slot.priority === 'CRITICAL' ? '🔥 CRITICAL' : slot.priority === 'HIGH_IMPACT' ? '⚡ HIGH IMPACT' : slot.priority === 'DEPTH' ? '📚 DEPTH' : '🚨 BREAK'}
-**Resources:** ${slot.resources.join(', ')}
-**Confidence:** ${'★'.repeat(slot.confidence)}${'☆'.repeat(5-slot.confidence)}
-**Energy:** ${'😃'.repeat(slot.energyBefore)}
+| Time Slot | Task / Topic | Priority | Notes / Resources |
+|-----------|-------------|----------|-------------------|
+${studyPlan.schedule.map(slot => 
+  `| ${slot.timeSlot} | ${slot.taskTopic} | ${slot.priority === 'High' ? '🔴 High' : slot.priority === 'Med' ? '🟡 Med' : slot.priority === 'Low' ? '🟢 Low' : '—'} | ${slot.notesResources} |`
+).join('\n')}
 
----
-`).join('\n')}
+## ✅ Priority Checklist
 
-## 📌 Quick Reference
-${studyPlan.quickReference.map(ref => `**${ref.formula}:** ${ref.definition}`).join('\n')}
+### 🔴 High Priority (Must Do)
+${studyPlan.highPriority.map(item => `- [${item.completed ? 'x' : ' '}] ${item.topic}`).join('\n')}
 
-## 📊 Progress Tracking
-**Progress:** ${'▓'.repeat(Math.floor(studyPlan.currentProgress/10))}${'░'.repeat(10-Math.floor(studyPlan.currentProgress/10))} ${studyPlan.currentProgress}%
-**Energy:** ${'😃'.repeat(studyPlan.overallEnergy)}
-**Weak Areas:** ${studyPlan.weakAreas.join(', ')}
+### 🟡 Medium Priority
+${studyPlan.mediumPriority.map(item => `- [${item.completed ? 'x' : ' '}] ${item.topic}`).join('\n')}
 
-*Generated by CramSmart - Study Panic-Proof* 🚀`;
+### 🟢 Low Priority
+${studyPlan.lowPriority.map(item => `- [${item.completed ? 'x' : ' '}] ${item.topic}`).join('\n')}
+
+## 📌 Quick Reference (Cheat Sheet)
+${studyPlan.quickReference.join('\n')}
+
+## 📊 Progress & Reflection
+**Progress Bar:** ${'▓'.repeat(Math.floor(studyPlan.progressPercent/10))}${'░'.repeat(10-Math.floor(studyPlan.progressPercent/10))} ${studyPlan.progressPercent}% Done
+**Energy Check:** ${studyPlan.energyLevel}
+**Notes for Review Tonight:**
+${studyPlan.reviewNotes.map(note => `• ${note}`).join('\n')}
+
+*Generated by CramSmart - Study Panic-Proof*`;
   };
 
   const generateDetailedCramGuideText = () => {
-    return `
-📘 CRAM PLAN • ${studyPlan.examName}
-Generated: ${new Date().toLocaleDateString()}
-Exam Date: ${studyPlan.examDate}
-Time Left: ${studyPlan.timeLeft}
+    return `📘 Last-Minute Study Plan
 
-💪 Motivation: "${studyPlan.motivation}"
+Exam: ${studyPlan.examName}
+Date: ${studyPlan.examDate}
+Time Left: ⏳ ${studyPlan.timeLeft}
 
-=================================================
+Motivation: "${studyPlan.motivation}"
 
-⏱️ TIME-BLOCKED SCHEDULE
+⏱️ Time-Blocked Schedule
+Time Slot\tTask / Topic\tPriority\tNotes / Resources
+${studyPlan.schedule.map(slot => 
+  `${slot.timeSlot}\t${slot.taskTopic}\t${slot.priority === 'High' ? '🔴 High' : slot.priority === 'Med' ? '🟡 Med' : slot.priority === 'Low' ? '🟢 Low' : '—'}\t${slot.notesResources}`
+).join('\n')}
 
-${studyPlan.schedule.map(slot => `
-${slot.startTime} - ${slot.endTime} | ${slot.task} (${slot.duration} min)
-Priority: ${slot.priority === 'CRITICAL' ? '🔥 CRITICAL' : slot.priority === 'HIGH_IMPACT' ? '⚡ HIGH IMPACT' : slot.priority === 'DEPTH' ? '📚 DEPTH' : '🚨 BREAK'}
-Status: ${slot.completed ? '[✓ COMPLETED]' : '[○ PENDING]'}
-Resources: ${slot.resources.join(', ')}
-Confidence: ${'★'.repeat(slot.confidence)}${'☆'.repeat(5-slot.confidence)}
-Energy: ${'😃'.repeat(slot.energyBefore)}
+(Adjust slots based on how many hours you have left)
 
-`).join('')}
+✅ Priority Checklist
 
-📌 QUICK REFERENCE CHEAT SHEET
-${studyPlan.quickReference.map(ref => `${ref.formula}: ${ref.definition}`).join('\n')}
+🔴 High Priority (Must Do)
+${studyPlan.highPriority.map(item => `☐ ${item.topic}`).join('\n')}
 
-📊 PROGRESS & REFLECTION
-Progress Bar: ${'▓'.repeat(Math.floor(studyPlan.currentProgress/10))}${'░'.repeat(10-Math.floor(studyPlan.currentProgress/10))} ${studyPlan.currentProgress}%
-Energy Check: ${'😃'.repeat(studyPlan.overallEnergy)}${'😐'.repeat(5-studyPlan.overallEnergy)}
+🟡 Medium Priority
+${studyPlan.mediumPriority.map(item => `☐ ${item.topic}`).join('\n')}
+
+🟢 Low Priority
+${studyPlan.lowPriority.map(item => `☐ ${item.topic}`).join('\n')}
+
+📌 Quick Reference (Cheat Sheet)
+${studyPlan.quickReference.join('\n')}
+
+📊 Progress & Reflection
+Progress Bar: ${'▓'.repeat(Math.floor(studyPlan.progressPercent/10))}${'░'.repeat(10-Math.floor(studyPlan.progressPercent/10))} ${studyPlan.progressPercent}% Done
+Energy Check (circle one): 😃 🙂 😐 😴
 Notes for Review Tonight:
-${studyPlan.weakAreas.map(area => `  • ${area}`).join('\n')}
+${studyPlan.reviewNotes.join('\n')}
 
-=================================================
 Generated by CramSmart - Study Panic-Proof
     `.trim();
   };
@@ -292,56 +353,21 @@ Generated by CramSmart - Study Panic-Proof
 
   const getPriorityColor = (priority: TimeSlot['priority']) => {
     switch (priority) {
-      case 'CRITICAL': return 'bg-destructive text-destructive-foreground';
-      case 'HIGH_IMPACT': return 'bg-accent text-accent-foreground';
-      case 'DEPTH': return 'bg-primary text-primary-foreground';
-      case 'BREAK': return 'bg-muted text-muted-foreground';
-      default: return 'bg-muted';
+      case 'High': return 'text-red-600 font-bold';
+      case 'Med': return 'text-yellow-600 font-bold';
+      case 'Low': return 'text-green-600 font-bold';
+      default: return 'text-muted-foreground';
     }
   };
 
   const getPriorityIcon = (priority: TimeSlot['priority']) => {
     switch (priority) {
-      case 'CRITICAL': return <Zap className="h-4 w-4" />;
-      case 'HIGH_IMPACT': return <Target className="h-4 w-4" />;
-      case 'DEPTH': return <Brain className="h-4 w-4" />;
-      case 'BREAK': return <Heart className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case 'High': return '🔴';
+      case 'Med': return '🟡';
+      case 'Low': return '🟢';
+      default: return '—';
     }
   };
-
-  const updateSlotCompletion = (index: number, completed: boolean) => {
-    // In a real app, this would update the data
-    console.log(`Slot ${index} completion: ${completed}`);
-  };
-
-  const renderPanicMode = () => (
-    <Card className="border-destructive bg-destructive/10">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-destructive">
-          <AlertTriangle className="h-5 w-5" />
-          🧘 PANIC BUTTON
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="font-medium">Feeling overwhelmed? Try this:</p>
-        <ol className="list-decimal list-inside space-y-2 text-sm">
-          <li>Take 5 deep breaths</li>
-          <li>Review what you've already completed ✅</li>
-          <li>Pick the easiest remaining task</li>
-          <li>Set timer for 25 minutes only</li>
-        </ol>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setShowPanicMode(false)}
-          className="w-full"
-        >
-          I'm Ready to Continue
-        </Button>
-      </CardContent>
-    </Card>
-  );
 
   return (
     <Card className="bg-gradient-subtle border-primary/20">
@@ -377,194 +403,165 @@ Generated by CramSmart - Study Panic-Proof
       <CardContent>
         {filesUploaded > 0 ? (
           <div className="space-y-6">
-            {/* Study Plan Header */}
-            <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-4 rounded-lg border">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-bold">📘 {studyPlan.examName}</h2>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPanicMode(!showPanicMode)}
-                  className="text-destructive border-destructive hover:bg-destructive/10"
-                >
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  Panic Button
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Exam Date</p>
-                  <p className="font-medium">🗓️ {studyPlan.examDate}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Time Left</p>
-                  <p className="font-medium">⏳ {studyPlan.timeLeft}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Energy Level</p>
-                  <p className="font-medium">{'😃'.repeat(currentEnergy)}{'😐'.repeat(5-currentEnergy)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Progress</p>
-                  <p className="font-medium">📊 {studyPlan.currentProgress}%</p>
-                </div>
-              </div>
-              <div className="mt-3 p-2 bg-primary/10 rounded text-center">
-                <p className="font-medium text-primary">💪 "{studyPlan.motivation}"</p>
+            {/* Study Plan Header - Matching Original Template */}
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold mb-2">📘 Last-Minute Study Plan</h2>
+              <div className="space-y-1">
+                <p><strong>Exam:</strong> {studyPlan.examName}</p>
+                <p><strong>Date:</strong> {studyPlan.examDate}</p>
+                <p><strong>Time Left:</strong> ⏳ {studyPlan.timeLeft}</p>
+                <p className="mt-3 p-2 bg-primary/10 rounded italic">
+                  <strong>Motivation:</strong> "{studyPlan.motivation}"
+                </p>
               </div>
             </div>
 
-            {/* Panic Mode */}
-            {showPanicMode && renderPanicMode()}
-
-            {/* Time-Blocked Schedule */}
+            {/* Time-Blocked Schedule Table */}
             <div>
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Timer className="h-5 w-5" />
-                ⏱️ Time-Blocked Schedule
-              </h3>
-              <div className="space-y-2">
-                {studyPlan.schedule.map((slot, index) => (
-                  <div key={index} className="bg-card rounded-lg border overflow-hidden">
-                    <div 
-                      className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setExpandedSlot(expandedSlot === index ? null : index)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Checkbox 
-                          checked={slot.completed}
-                          onCheckedChange={(checked) => updateSlotCompletion(index, !!checked)}
-                        />
-                        <div className="flex items-center gap-2">
-                          {getPriorityIcon(slot.priority)}
-                          <span className={`font-medium ${slot.completed ? 'line-through text-muted-foreground' : ''}`}>
-                            {slot.startTime} - {slot.endTime}
+              <h3 className="font-bold text-lg mb-3">⏱️ Time-Blocked Schedule</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="border border-gray-300 p-2 text-left font-semibold">Time Slot</th>
+                      <th className="border border-gray-300 p-2 text-left font-semibold">Task / Topic</th>
+                      <th className="border border-gray-300 p-2 text-left font-semibold">Priority</th>
+                      <th className="border border-gray-300 p-2 text-left font-semibold">Notes / Resources</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studyPlan.schedule.map((slot, index) => (
+                      <tr key={index} className="hover:bg-muted/50">
+                        <td className="border border-gray-300 p-2 text-sm">{slot.timeSlot}</td>
+                        <td className="border border-gray-300 p-2 text-sm">{slot.taskTopic}</td>
+                        <td className="border border-gray-300 p-2 text-sm">
+                          <span className={getPriorityColor(slot.priority)}>
+                            {getPriorityIcon(slot.priority)} {slot.priority}
                           </span>
-                        </div>
-                        <span className="text-sm font-medium">{slot.task}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {slot.duration}min
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getPriorityColor(slot.priority)}>
-                          {slot.priority === 'CRITICAL' ? '🔥 CRITICAL' : 
-                           slot.priority === 'HIGH_IMPACT' ? '⚡ HIGH IMPACT' :
-                           slot.priority === 'DEPTH' ? '📚 DEPTH' : '🚨 BREAK'}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {expandedSlot === index ? '−' : '+'}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-sm text-muted-foreground">{slot.notesResources}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                (Adjust slots based on how many hours you have left)
+              </p>
+            </div>
+
+            {/* Priority Checklist */}
+            <div>
+              <h3 className="font-bold text-lg mb-3">✅ Priority Checklist</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-red-600 mb-2">🔴 High Priority (Must Do)</h4>
+                  <div className="space-y-1">
+                    {studyPlan.highPriority.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Checkbox 
+                          checked={item.completed}
+                          onCheckedChange={() => {/* Update completion */}}
+                        />
+                        <span className={item.completed ? 'line-through text-muted-foreground' : ''}>
+                          {item.topic}
                         </span>
                       </div>
-                    </div>
-                    
-                    {expandedSlot === index && (
-                      <div className="px-3 pb-3 space-y-3 border-t bg-muted/20">
-                        <div className="grid md:grid-cols-2 gap-4 pt-3">
-                          <div>
-                            <p className="text-sm font-medium mb-2">📚 Resources:</p>
-                            <div className="space-y-1">
-                              {slot.resources.map((resource, i) => (
-                                <p key={i} className="text-xs text-muted-foreground">• {resource}</p>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium mb-2">⚡ Confidence Level:</p>
-                            <p className="text-sm">{'★'.repeat(slot.confidence)}{'☆'.repeat(5-slot.confidence)} ({slot.confidence}/5)</p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium mb-1">🔋 Energy Before:</p>
-                            <div className="flex items-center gap-1">
-                              {[1,2,3,4,5].map(level => (
-                                <Button
-                                  key={level}
-                                  variant={slot.energyBefore >= level ? "default" : "outline"}
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {/* Update energy */}}
-                                >
-                                  {level <= slot.energyBefore ? '😃' : '😐'}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium mb-1">📝 Quick Notes:</p>
-                            <input 
-                              type="text" 
-                              placeholder="Add notes..."
-                              className="w-full text-xs p-1 border rounded"
-                              defaultValue={slot.notes}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-yellow-600 mb-2">🟡 Medium Priority</h4>
+                  <div className="space-y-1">
+                    {studyPlan.mediumPriority.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Checkbox 
+                          checked={item.completed}
+                          onCheckedChange={() => {/* Update completion */}}
+                        />
+                        <span className={item.completed ? 'line-through text-muted-foreground' : ''}>
+                          {item.topic}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-green-600 mb-2">🟢 Low Priority</h4>
+                  <div className="space-y-1">
+                    {studyPlan.lowPriority.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Checkbox 
+                          checked={item.completed}
+                          onCheckedChange={() => {/* Update completion */}}
+                        />
+                        <span className={item.completed ? 'line-through text-muted-foreground' : ''}>
+                          {item.topic}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Quick Reference */}
             <div>
-              <h3 className="font-semibold mb-3">📌 Quick Reference Cheat Sheet</h3>
-              <div className="bg-primary/5 p-4 rounded-lg border">
-                <div className="grid gap-2">
+              <h3 className="font-bold text-lg mb-3">📌 Quick Reference (Cheat Sheet)</h3>
+              <div className="bg-muted/30 p-4 rounded-lg border">
+                <div className="space-y-2">
                   {studyPlan.quickReference.map((ref, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 bg-card rounded border">
-                      <code className="text-sm font-mono bg-muted px-2 py-1 rounded">{ref.formula}</code>
-                      <span className="text-sm text-muted-foreground">{ref.definition}</span>
-                    </div>
+                    <p key={index} className="text-sm">
+                      <strong>{ref.split(':')[0]}:</strong> {ref.split(':').slice(1).join(':')}
+                    </p>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Progress Tracking */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-success/10 rounded-lg border">
-                <div className="text-2xl font-bold text-success">
-                  {studyPlan.schedule.filter(s => s.completed).length}
+            {/* Progress & Reflection */}
+            <div>
+              <h3 className="font-bold text-lg mb-3">📊 Progress & Reflection</h3>
+              <div className="space-y-3 bg-muted/20 p-4 rounded-lg">
+                <div>
+                  <p className="text-sm"><strong>Progress Bar:</strong></p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="font-mono text-lg">
+                      {'▓'.repeat(Math.floor(studyPlan.progressPercent/10))}
+                      {'░'.repeat(10-Math.floor(studyPlan.progressPercent/10))}
+                    </div>
+                    <span className="text-sm font-semibold">{studyPlan.progressPercent}% Done</span>
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">Completed</div>
-                <div className="text-xs text-success mt-1">
-                  {'▓'.repeat(Math.floor(studyPlan.schedule.filter(s => s.completed).length / 2))}
+                
+                <div>
+                  <p className="text-sm mb-2"><strong>Energy Check (circle one):</strong></p>
+                  <div className="flex items-center gap-2">
+                    {['😃', '🙂', '😐', '😴'].map((emoji, index) => (
+                      <Button
+                        key={index}
+                        variant={studyPlan.energyLevel === emoji ? "default" : "outline"}
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {/* Update energy level */}}
+                      >
+                        {emoji}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="text-center p-4 bg-accent/10 rounded-lg border">
-                <div className="text-2xl font-bold text-accent">
-                  {studyPlan.schedule.filter(s => !s.completed && s.priority !== 'BREAK').length}
+                
+                <div>
+                  <p className="text-sm font-semibold mb-2">Notes for Review Tonight:</p>
+                  <div className="space-y-1">
+                    {studyPlan.reviewNotes.map((note, index) => (
+                      <p key={index} className="text-sm text-muted-foreground">• {note}</p>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">Remaining</div>
-                <div className="text-xs text-accent mt-1">
-                  {'▓'.repeat(Math.floor(studyPlan.currentProgress/10))}{'░'.repeat(10-Math.floor(studyPlan.currentProgress/10))}
-                </div>
-              </div>
-              <div className="text-center p-4 bg-primary/10 rounded-lg border">
-                <div className="text-2xl font-bold text-primary flex items-center justify-center gap-1">
-                  <Gauge className="h-6 w-6" />
-                  {studyPlan.currentProgress}%
-                </div>
-                <div className="text-sm text-muted-foreground">Overall Progress</div>
-                <div className="text-xs mt-1">
-                  {'😃'.repeat(currentEnergy)}{'😐'.repeat(5-currentEnergy)}
-                </div>
-              </div>
-            </div>
-
-            {/* Weak Areas */}
-            <div className="bg-warning/10 p-4 rounded-lg border border-warning/20">
-              <h4 className="font-medium mb-2 text-warning">🎯 Focus Areas for Tonight:</h4>
-              <div className="flex flex-wrap gap-2">
-                {studyPlan.weakAreas.map((area, index) => (
-                  <Badge key={index} variant="outline" className="border-warning text-warning">
-                    {area}
-                  </Badge>
-                ))}
               </div>
             </div>
           </div>
